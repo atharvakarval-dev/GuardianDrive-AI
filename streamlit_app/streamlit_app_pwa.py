@@ -219,7 +219,7 @@ def play_alarm():
                 playsound(alarm_path)
                 break
     except:
-        st.warning("Audio alert failed to play.")
+        print("Audio alert failed to play.")
 
 alarm_thread = None
 
