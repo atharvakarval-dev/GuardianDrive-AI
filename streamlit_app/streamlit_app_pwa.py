@@ -28,65 +28,76 @@ CONSEC_FRAMES = 20
 def serve_pwa_files():
     """Add routes for PWA files"""
     
+    # Get base64 encoded icons
+    def get_icon_base64(icon_path):
+        try:
+            if os.path.exists(icon_path):
+                with open(icon_path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode()
+        except:
+            pass
+        return ""
+    
+    # Get manifest base64
+    def get_manifest_base64():
+        manifest_path = 'manifest.json'
+        if os.path.exists(manifest_path):
+            try:
+                with open(manifest_path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode()
+            except:
+                pass
+        return base64.b64encode(b'{}').decode()
+    
+    icon_192 = get_icon_base64('icons/icon-192x192.png')
+    manifest_b64 = get_manifest_base64()
+    
     # Add custom CSS and PWA meta tags
-    pwa_head = """
-    <head>
-        <link rel="manifest" href="data:application/json;base64,""" + base64.b64encode(
-            open('manifest.json', 'rb').read() if os.path.exists('manifest.json') else b'{}'
-        ).decode() + """">
-        <meta name="theme-color" content="#ff6b6b">
-        <meta name="apple-mobile-web-app-capable" content="yes">
-        <meta name="apple-mobile-web-app-status-bar-style" content="default">
-        <meta name="apple-mobile-web-app-title" content="DrowsinessDetect">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    pwa_head = f"""
+    <link rel="manifest" href="data:application/json;base64,{manifest_b64}">
+    <meta name="theme-color" content="#ff6b6b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="DrowsinessDetect">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    {f'<link rel="icon" type="image/png" sizes="192x192" href="data:image/png;base64,{icon_192}">' if icon_192 else ''}
+    {f'<link rel="apple-touch-icon" href="data:image/png;base64,{icon_192}">' if icon_192 else ''}
+    
+    <style>
+        .install-button {{
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: #ff6b6b;
+            color: white;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            z-index: 1000;
+            font-size: 12px;
+            display: none;
+        }}
+        .install-button:hover {{
+            background: #ff5252;
+        }}
         
-        <!-- PWA Icons -->
-        <link rel="icon" type="image/png" sizes="32x32" href="data:image/png;base64,""" + (
-            base64.b64encode(open('icons/icon-192x192.png', 'rb').read()).decode() 
-            if os.path.exists('icons/icon-192x192.png') else ""
-        ) + """">
-        <link rel="apple-touch-icon" href="data:image/png;base64,""" + (
-            base64.b64encode(open('icons/icon-192x192.png', 'rb').read()).decode() 
-            if os.path.exists('icons/icon-192x192.png') else ""
-        ) + """">
+        @media (max-width: 768px) {{
+            .main .block-container {{
+                padding-top: 2rem;
+                padding-bottom: 2rem;
+            }}
+        }}
         
-        <style>
-            .install-button {
-                position: fixed;
-                top: 10px;
-                right: 10px;
-                background: #ff6b6b;
-                color: white;
-                border: none;
-                padding: 8px 12px;
-                border-radius: 6px;
-                cursor: pointer;
-                z-index: 1000;
-                font-size: 12px;
-                display: none;
-            }
-            .install-button:hover {
-                background: #ff5252;
-            }
-            
-            /* PWA-friendly responsive design */
-            @media (max-width: 768px) {
-                .main .block-container {
-                    padding-top: 2rem;
-                    padding-bottom: 2rem;
-                }
-            }
-            
-            /* Hide Streamlit branding for PWA */
-            .viewerBadge_container__1QSob {
-                display: none;
-            }
-            
-            footer {
-                visibility: hidden;
-            }
-        </style>
-    </head>
+        .viewerBadge_container__1QSob {{
+            display: none;
+        }}
+        
+        footer {{
+            visibility: hidden;
+        }}
+    </style>
     """
     
     # PWA JavaScript for service worker and install prompt
@@ -187,7 +198,12 @@ def serve_pwa_files():
 def play_alarm():
     try:
         from playsound import playsound
-        playsound('alarm.mp3')
+        # Try multiple alarm file locations
+        alarm_paths = ['alarm.mp3', '../alarm.mp3', 'alarm.wav', '../alarm.wav']
+        for alarm_path in alarm_paths:
+            if os.path.exists(alarm_path):
+                playsound(alarm_path)
+                break
     except:
         st.warning("Audio alert failed to play.")
 
@@ -221,8 +237,12 @@ def calculate_ear(landmarks, eye_indices):
 
 class DrowsinessDetector(VideoProcessorBase):
     def __init__(self):
-        # Load Face Landmarker
-        base_options = python.BaseOptions(model_asset_path='models/face_landmarker.task')
+        # Load Face Landmarker - adjust path relative to project root
+        model_path = os.path.join('..', 'models', 'face_landmarker.task')
+        if not os.path.exists(model_path):
+            model_path = os.path.join('models', 'face_landmarker.task')
+        
+        base_options = python.BaseOptions(model_asset_path=model_path)
         options = vision.FaceLandmarkerOptions(base_options=base_options,
                                                output_face_blendshapes=False,
                                                output_facial_transformation_matrixes=False,
@@ -281,6 +301,10 @@ class DrowsinessDetector(VideoProcessorBase):
 
 # Main Streamlit app
 def main():
+    # Change to streamlit_app directory for proper file paths
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    os.chdir(script_dir)
+    
     # Set page config
     st.set_page_config(
         page_title="Driver Drowsiness Detection", 
