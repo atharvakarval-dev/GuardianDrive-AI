@@ -210,16 +210,78 @@ def serve_pwa_files():
 
 # Load alarm
 def play_alarm():
+    """Play audio alert using robust platform-specific methods."""
+    import os
+    import time
+    import subprocess
+    import platform
+    
     try:
-        from playsound import playsound
-        # Try multiple alarm file locations
-        alarm_paths = ['alarm.mp3', '../alarm.mp3', 'alarm.wav', '../alarm.wav']
-        for alarm_path in alarm_paths:
-            if os.path.exists(alarm_path):
-                playsound(alarm_path)
+        # Determine the root directory (parent of streamlit_app)
+        current_dir = os.path.dirname(os.path.abspath(__file__))
+        root_dir = os.path.dirname(current_dir)
+        
+        # Potential paths for the alarm file
+        potential_paths = [
+            os.path.join(root_dir, 'alarm.mp3'),
+            os.path.join(root_dir, 'alarm.wav'),
+            os.path.join(current_dir, 'alarm.mp3'),
+            os.path.abspath('alarm.mp3'),
+            os.path.abspath('../alarm.mp3')
+        ]
+        
+        target_alarm = None
+        for p in potential_paths:
+            if os.path.exists(p):
+                target_alarm = p
                 break
-    except:
-        print("Audio alert failed to play.")
+        
+        if not target_alarm:
+            print(f"❌ Alarm file not found. Searched in: {potential_paths}")
+            return
+
+        # print(f"Playing alarm from: {target_alarm}")  # Debug log
+
+        system = platform.system()
+        
+        if system == "Windows":
+            # PowerShell method (Most reliable for MP3 on Windows without dependencies)
+            ps_script = f"""
+            Add-Type -AssemblyName PresentationCore
+            $player = New-Object System.Windows.Media.MediaPlayer
+            $player.Open('{target_alarm}')
+            $player.Play()
+            Start-Sleep 3
+            """
+            subprocess.run(["powershell", "-c", ps_script], check=True)
+            
+        elif system == "Darwin":  # macOS
+            subprocess.run(["afplay", target_alarm], check=True)
+            
+        else:  # Linux/Other
+            # Try a sequence of common players
+            players = ["mpg123", "ffplay", "aplay"]
+            played = False
+            for player in players:
+                try:
+                    subprocess.run([player, "-nodisp", "-autoexit", target_alarm], 
+                                 stdout=subprocess.DEVNULL, 
+                                 stderr=subprocess.DEVNULL,
+                                 timeout=3)
+                    played = True
+                    break
+                except:
+                    continue
+            
+            if not played:
+                # Fallback to playsound if installed
+                from playsound import playsound
+                playsound(target_alarm)
+                
+    except Exception as e:
+        print(f"❌ Audio alert failed to play: {e}")
+
+
 
 alarm_thread = None
 
