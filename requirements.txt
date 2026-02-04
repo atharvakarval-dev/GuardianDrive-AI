@@ -25,7 +25,8 @@ scipy>=1.7.0,<2.0.0
 # AUDIO PROCESSING
 # ====================================================================
 # Note: Server-side audio playback will not work on Streamlit Cloud clients.
-# playsound>=1.2.2,<2.0.0
+# playsound replaced with pygame for better compatibility
+pygame>=2.5.0,<3.0.0
 
 # ====================================================================
 # DATA VISUALIZATION

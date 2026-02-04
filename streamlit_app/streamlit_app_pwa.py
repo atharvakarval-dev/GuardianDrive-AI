@@ -210,14 +210,12 @@ def serve_pwa_files():
 
 # Load alarm
 def play_alarm():
-    """Play audio alert using robust platform-specific methods."""
+    """Play audio alert using pygame (Cross-platform & Robust)."""
     import os
     import time
-    import subprocess
-    import platform
     
     try:
-        # Determine the root directory (parent of streamlit_app)
+        # Determine the root directory
         current_dir = os.path.dirname(os.path.abspath(__file__))
         root_dir = os.path.dirname(current_dir)
         
@@ -226,8 +224,7 @@ def play_alarm():
             os.path.join(root_dir, 'alarm.mp3'),
             os.path.join(root_dir, 'alarm.wav'),
             os.path.join(current_dir, 'alarm.mp3'),
-            os.path.abspath('alarm.mp3'),
-            os.path.abspath('../alarm.mp3')
+            os.path.abspath('alarm.mp3')
         ]
         
         target_alarm = None
@@ -237,52 +234,29 @@ def play_alarm():
                 break
         
         if not target_alarm:
-            print(f"❌ Alarm file not found. Searched in: {potential_paths}")
+            print(f"❌ Alarm file not found.")
             return
 
-        # print(f"Playing alarm from: {target_alarm}")  # Debug log
-
-        system = platform.system()
-        
-        if system == "Windows":
-            # PowerShell method (Most reliable for MP3 on Windows without dependencies)
-            ps_script = f"""
-            Add-Type -AssemblyName PresentationCore
-            $player = New-Object System.Windows.Media.MediaPlayer
-            $player.Open('{target_alarm}')
-            $player.Play()
-            Start-Sleep 3
-            """
-            subprocess.run(["powershell", "-c", ps_script], check=True)
+        # Initialize pygame mixer
+        import pygame
+        try:
+            pygame.mixer.init()
+            pygame.mixer.music.load(target_alarm)
+            pygame.mixer.music.play()
             
-        elif system == "Darwin":  # macOS
-            subprocess.run(["afplay", target_alarm], check=True)
-            
-        else:  # Linux/Other
-            # Try a sequence of common players
-            players = ["mpg123", "ffplay", "aplay"]
-            played = False
-            for player in players:
-                try:
-                    subprocess.run([player, "-nodisp", "-autoexit", target_alarm], 
-                                 stdout=subprocess.DEVNULL, 
-                                 stderr=subprocess.DEVNULL,
-                                 timeout=3)
-                    played = True
-                    break
-                except:
-                    continue
-            
-            if not played:
-                # Fallback to playsound if installed
-                try:
-                    from playsound import playsound
-                    playsound(target_alarm)
-                except ImportError:
-                    print("⚠️ 'playsound' module is not installed. Audio alert skipped.")
+            # Wait for audio to finish (non-blocking in main thread, but blocking here for the thread)
+            while pygame.mixer.music.get_busy():
+                time.sleep(0.1)
                 
+        except pygame.error as e:
+            print(f"⚠️ Pygame audio error (No audio device on server?): {e}")
+        except Exception as e:
+            print(f"⚠️ Audio playback failed: {e}")
+            
+    except ImportError:
+        print("❌ 'pygame' not installed.")
     except Exception as e:
-        print(f"❌ Audio alert failed to play: {e}")
+        print(f"❌ Audio system error: {e}")
 
 
 
