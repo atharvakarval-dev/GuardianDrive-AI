@@ -65,7 +65,7 @@ class AdaptiveVisionAnalyzer:
     def __init__(self):
         self.baseline_established = False
         self.calibration_frames = 0
-        self.baseline_window_frames = 120 * 30  # 2 minutes @ 30fps
+        self.baseline_window_frames = 5 * 30  # 5 seconds @ 30fps
         
         # Extended History Buffers with temporal analysis
         self.ear_history = deque(maxlen=3600)       # 2 min @ 30fps
@@ -681,7 +681,7 @@ class MultiModalFusionEngine:
         self.vehicle = VehicleDynamicsAnalyzer()
         
         # State tracking
-        self.confidence_history = deque(maxlen=180)  # 6 sec smoothing
+        self.confidence_history = deque(maxlen=30)  # 1 sec smoothing
         self.state_history = deque(maxlen=60)
         self.risk_trajectory = deque(maxlen=300)
         
@@ -774,15 +774,21 @@ class MultiModalFusionEngine:
                 return DriverState.MODERATE_RISK
                 
         elif confidence > 0.3:
-            if is_distracted:
+            if has_severe_closure:
+                return DriverState.ASLEEP
+            elif is_drowsy_signal:
+                return DriverState.DROWSY
+            elif is_distracted:
                 return DriverState.DISTRACTED
             else:
                 return DriverState.LOW_RISK
                 
         else:
             # Safety net for sleep even at low confidence
-            if has_extended_closure:
+            if has_severe_closure:
                 return DriverState.ASLEEP
+            elif is_drowsy_signal:
+                return DriverState.DROWSY
             elif is_distracted:
                 return DriverState.DISTRACTED
             else:

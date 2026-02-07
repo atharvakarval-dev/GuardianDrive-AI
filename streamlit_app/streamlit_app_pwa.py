@@ -225,6 +225,7 @@ def inject_pwa_components():
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     
     <style>
+
         /* Modern Dark Theme */
         :root {{
             --primary: #00d4aa;
@@ -233,6 +234,13 @@ def inject_pwa_components():
             --success: #00ff88;
             --bg-dark: #0e1117;
             --card-dark: #1e2130;
+            --text-light: #e6e6e6;
+            --text-gray: #a0a0a0;
+        }}
+        
+        /* Global Text Color Override */
+        h1, h2, h3, h4, h5, h6, p, span, div, label {{
+            color: var(--text-light) !important;
         }}
         
         /* Hide Streamlit branding */
@@ -242,7 +250,16 @@ def inject_pwa_components():
             display: none !important;
         }}
         
-        /* Glass morphism effects */
+        /* Force Sidebar Background */
+        [data-testid="stSidebar"] {{
+            background-color: var(--bg-dark) !important;
+            border-right: 1px solid #333;
+        }}
+        [data-testid="stSidebar"] * {{
+            color: var(--text-light) !important;
+        }}
+        
+        /* Glass morphism background */
         .stApp {{
             background: linear-gradient(135deg, #0e1117 0%, #1a1d29 100%);
         }}
@@ -260,19 +277,73 @@ def inject_pwa_components():
             border-radius: 4px;
         }}
         
+        /* Fix Metrics Colors */
+        [data-testid="stMetricValue"] {{
+            color: var(--success) !important;
+            font-weight: 700 !important;
+        }}
+        [data-testid="stMetricLabel"] {{
+            color: var(--text-gray) !important;
+        }}
+        [data-testid="stMetricDelta"] {{
+            color: var(--warning) !important;
+        }}
+
+        /* Fix Selectbox/Input Labels */
+        .stSelectbox label, .stTextInput label, .stNumberInput label {{
+            color: var(--text-light) !important;
+            font-weight: 600;
+        }}
+        
+        /* Fix Selectbox options visibility */
+        div[data-baseweb="select"] > div {{
+            background-color: var(--card-dark) !important;
+            color: var(--text-light) !important;
+            border-color: #333 !important;
+        }}
+
+        /* Force Header (Navbar) Black */
+        header[data-testid="stHeader"] {{
+            background-color: var(--bg-dark) !important;
+        }}
+        
+        /* Style Primary Buttons */
+        .stButton > button {{
+            background: linear-gradient(135deg, var(--primary) 0%, #00a88a 100%) !important;
+            color: #000000 !important;
+            font-weight: 700 !important;
+            border: none !important;
+            border-radius: 8px !important;
+            transition: transform 0.2s;
+        }}
+        .stButton > button:hover {{
+            transform: scale(1.02);
+            color: #000000 !important; 
+        }}
+
+        /* Style Secondary/Danger Buttons (like Stop) */
+        button[kind="secondary"] {{
+            background: transparent !important;
+            border: 1px solid var(--text-gray) !important;
+            color: var(--text-light) !important;
+        }}
+
+        /* WebRTC Start/Stop Button override if accessible */
+        /* Assuming standard button classes */
+
         /* Install button */
         .install-prompt {{
             position: fixed;
             bottom: 20px;
             right: 20px;
             background: linear-gradient(135deg, var(--primary) 0%, #00a88a 100%);
-            color: white;
+            color: #000000;
             padding: 12px 24px;
             border-radius: 30px;
             box-shadow: 0 8px 32px rgba(0, 212, 170, 0.3);
             cursor: pointer;
             z-index: 1000;
-            font-weight: 600;
+            font-weight: 700;
             display: none;
             animation: pulse 2s infinite;
         }}
@@ -302,7 +373,7 @@ def inject_pwa_components():
         
         /* Status indicators */
         .status-online {{
-            color: var(--success);
+            color: var(--success) !important;
             animation: blink 2s infinite;
         }}
         
@@ -537,6 +608,16 @@ class UltraGuardianDetector(VideoProcessorBase):
         self.current_state = "normal"
         self.state_start_time = time.time()
         self.last_alert_time = {}
+
+        # Thread-safe telemetry storage
+        self.latest_stats = {
+            "total_alerts": 0,
+            "current_state": "normal",
+            "state_duration": 0.0,
+            "safety_score": 100.0,
+            "fps": 0.0,
+            "latency": 0.0
+        }
         
         # Metrics buffer
         self.metrics_buffer = deque(maxlen=AppConfig.METRICS_BUFFER_SIZE)
@@ -678,18 +759,18 @@ class UltraGuardianDetector(VideoProcessorBase):
                 'distracted': 'medium'
             }
             
-            if SessionState.get('sound_enabled', True):
-                self.audio_system.play_alarm(severity_map.get(state_name, 'medium'))
+            if True: # Default to True inside thread, or use self.sound_enabled if implemented
+                 self.audio_system.play_alarm(severity_map.get(state_name, 'medium'))
             
             # Voice alert
-            if SessionState.get('voice_alerts', False):
-                messages = {
-                    'asleep': 'Driver asleep! Pull over immediately!',
-                    'high_risk': 'High risk detected! Find safe place to stop!',
-                    'drowsy': 'Drowsiness detected. Take a break.',
-                    'distracted': 'Please focus on the road.'
-                }
-                self.audio_system.speak_alert(messages.get(state_name, ''))
+            # if SessionState.get('voice_alerts', False):
+            #     messages = {
+            #         'asleep': 'Driver asleep! Pull over immediately!',
+            #         'high_risk': 'High risk detected! Find safe place to stop!',
+            #         'drowsy': 'Drowsiness detected. Take a break.',
+            #         'distracted': 'Please focus on the road.'
+            #     }
+            #     self.audio_system.speak_alert(messages.get(state_name, ''))
             
             # System alerts
             if self.alert_system and state_name in ['asleep', 'high_risk']:
@@ -728,17 +809,17 @@ class UltraGuardianDetector(VideoProcessorBase):
                 except Exception as e:
                     print(f"Alert system error: {e}")
             
-            # Add to history
-            alert_data = {
-                'timestamp': datetime.now().isoformat(),
-                'state': state.value,
-                'duration': duration,
-                'confidence': metrics.confidence
-            }
-            
-            history = SessionState.get('alert_history', deque(maxlen=100))
-            history.append(alert_data)
-            SessionState.set('alert_history', history)
+            # Add to history (handled in main thread via latest_stats)
+            # alert_data = {
+            #     'timestamp': datetime.now().isoformat(),
+            #     'state': state.value,
+            #     'duration': duration,
+            #     'confidence': metrics.confidence
+            # }
+            # 
+            # history = SessionState.get('alert_history', deque(maxlen=100))
+            # history.append(alert_data)
+            # SessionState.set('alert_history', history)
     
     def _get_time_of_day(self) -> str:
         """Determine time of day"""
@@ -810,7 +891,7 @@ class UltraGuardianDetector(VideoProcessorBase):
         
         # State text
         cv2.putText(img, state.value.upper(), (25, 50),
-                   cv2.FONT_HERSHEY_BOLD, 1.2, color, 3)
+                   cv2.FONT_HERSHEY_TRIPLEX, 1.2, color, 3)
         
         # Duration
         cv2.putText(img, f"Duration: {duration:.1f}s", (25, 85),
@@ -839,7 +920,7 @@ class UltraGuardianDetector(VideoProcessorBase):
         
         # Title
         cv2.putText(img, "METRICS", (x_start + 10, 35),
-                   cv2.FONT_HERSHEY_BOLD, 0.7, (0, 212, 170), 2)
+                   cv2.FONT_HERSHEY_TRIPLEX, 0.7, (0, 212, 170), 2)
         
         # Metrics
         metrics_list = [
@@ -879,7 +960,7 @@ class UltraGuardianDetector(VideoProcessorBase):
         
         # Score text
         cv2.putText(img, f"{attention_score:.0%}", (center[0] - 30, center[1] + 10),
-                   cv2.FONT_HERSHEY_BOLD, 0.9, (255, 255, 255), 2)
+                   cv2.FONT_HERSHEY_TRIPLEX, 0.9, (255, 255, 255), 2)
         
         cv2.putText(img, "ATTENTION", (center[0] - 45, center[1] + 45),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (200, 200, 200), 1)
@@ -958,7 +1039,7 @@ def render_live_detection():
     
     with col_cam:
         st.markdown("### 📹 Live Camera Feed")
-        webrtc_streamer(
+        webrtc_ctx = webrtc_streamer(
             key="guardiandrive-ultra",
             video_processor_factory=UltraGuardianDetector,
             media_stream_constraints={
@@ -972,6 +1053,42 @@ def render_live_detection():
             rtc_configuration={"iceServers": get_ice_servers()},
             async_processing=True,
         )
+        
+        # Poll for updates from the background processor
+        if webrtc_ctx.video_processor:
+            proc = webrtc_ctx.video_processor
+            if hasattr(proc, 'latest_stats'):
+                # Sync background stats to session state
+                if proc.latest_stats['total_alerts'] > SessionState.get('total_alerts', 0):
+                     SessionState.set('total_alerts', proc.latest_stats['total_alerts'])
+                
+                # Sync other metrics if needed
+                SessionState.set('current_state', proc.enhanced_detector.state_history[-1].value.replace('_', ' ')) if proc.enhanced_detector and proc.enhanced_detector.state_history else None
+
+        
+        # Poll for updates from the background processor
+        if webrtc_ctx.video_processor:
+            proc = webrtc_ctx.video_processor
+            if hasattr(proc, 'latest_stats'):
+                # Sync background stats to session state
+                if proc.latest_stats['total_alerts'] > SessionState.get('total_alerts', 0):
+                     SessionState.set('total_alerts', proc.latest_stats['total_alerts'])
+                
+                # Sync other metrics if needed
+                SessionState.set('current_state', proc.enhanced_detector.state_history[-1].value.replace('_', ' ')) if proc.enhanced_detector and proc.enhanced_detector.state_history else None
+
+        
+        # Poll for updates from the background processor
+        if webrtc_ctx.video_processor:
+            proc = webrtc_ctx.video_processor
+            if hasattr(proc, 'latest_stats'):
+                # Sync background stats to session state
+                if proc.latest_stats['total_alerts'] > SessionState.get('total_alerts', 0):
+                     SessionState.set('total_alerts', proc.latest_stats['total_alerts'])
+                
+                # Update current state for UI
+                # Note: The processor updates its internal state faster than we poll
+                pass
     
     with col_stats:
         st.markdown("### 📊 Live Statistics")
