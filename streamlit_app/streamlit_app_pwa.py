@@ -344,7 +344,7 @@ class GuardianDriveDetector(VideoProcessorBase):
         # Session tracking for insurance
         self.session_start = time.time()
         self.session_id = f"SESSION_{int(self.session_start)}"
-        self.current_state = DriverState.SOBER_ALERT
+        self.current_state = DriverState.NORMAL
         self.state_duration = 0
         self.last_alert_time = 0
         self.total_alerts = 0
@@ -375,7 +375,8 @@ class GuardianDriveDetector(VideoProcessorBase):
                     landmarks = [(int(l.x * w), int(l.y * h)) for l in face_landmarks]
                     
                     # Process with enhanced detector
-                    state, metrics = self.enhanced_detector.process_frame(landmarks, (h, w))
+                    # Pass empty vehicle data for now (camera-only mode)
+                    state, metrics = self.enhanced_detector.process_frame(landmarks, (h, w), {})
                     
                     # Update state tracking
                     if state == self.current_state:
@@ -394,7 +395,7 @@ class GuardianDriveDetector(VideoProcessorBase):
                     current_time = time.time()
                     
                     # Handle critical states with full GuardianDrive AI integration
-                    if state in [DriverState.DROWSY, DriverState.ASLEEP, DriverState.INTOXICATED]:
+                    if state in [DriverState.DROWSY, DriverState.ASLEEP, DriverState.HIGH_RISK]:
                         if current_time - self.last_alert_time > 5.0:
                             self.total_alerts += 1
                             
@@ -402,14 +403,14 @@ class GuardianDriveDetector(VideoProcessorBase):
                                 self.drowsy_events += 1
                             
                             # 1. Log to Risk Mapping System
-                            severity = 5 if state == DriverState.ASLEEP else 4 if state == DriverState.INTOXICATED else 3
+                            severity = 5 if state == DriverState.ASLEEP else 4 if state == DriverState.HIGH_RISK else 3
                             risk_mapper.log_risk_event(
                                 location["lat"], location["lng"],
                                 state.value.lower(), severity
                             )
                             
                             # 2. Trigger Multi-Stakeholder Alerts for severe cases
-                            if state in [DriverState.ASLEEP, DriverState.INTOXICATED]:
+                            if state in [DriverState.ASLEEP, DriverState.HIGH_RISK]:
                                 stakeholder_alerts.trigger_coordinated_response(
                                     driver_state=state.value,
                                     location=location,
@@ -433,7 +434,7 @@ class GuardianDriveDetector(VideoProcessorBase):
                             self.last_alert_time = current_time
                         
                         # Play alarm for critical states
-                        if state in [DriverState.ASLEEP, DriverState.INTOXICATED]:
+                        if state in [DriverState.ASLEEP, DriverState.HIGH_RISK]:
                             if alarm_thread is None or not alarm_thread.is_alive():
                                 alarm_thread = threading.Thread(target=play_alarm)
                                 alarm_thread.start()
@@ -475,10 +476,12 @@ class GuardianDriveDetector(VideoProcessorBase):
         
         # State indicator with color coding
         state_colors = {
-            DriverState.SOBER_ALERT: (0, 255, 0),
+            DriverState.NORMAL: (0, 255, 0),
+            DriverState.LOW_RISK: (0, 255, 255),
+            DriverState.MODERATE_RISK: (0, 165, 255),
+            DriverState.HIGH_RISK: (0, 0, 255),
             DriverState.DROWSY: (0, 255, 255),
-            DriverState.ASLEEP: (0, 0, 255),
-            DriverState.INTOXICATED: (255, 0, 255)
+            DriverState.ASLEEP: (0, 0, 255)
         }
         
         color = state_colors.get(state, (255, 255, 255))
@@ -490,6 +493,8 @@ class GuardianDriveDetector(VideoProcessorBase):
         # Metrics display
         y_offset = 60
         metrics_text = [
+            f"Risk Score: {metrics.risk_score:.2f}",
+            f"Confidence: {metrics.confidence:.2f}",
             f"EAR: {metrics.ear:.3f}",
             f"MAR: {metrics.mar:.3f}",
             f"PERCLOS: {metrics.perclos:.2f}",
@@ -505,13 +510,13 @@ class GuardianDriveDetector(VideoProcessorBase):
             y_offset += 25
         
         # Alert indicator
-        if state != DriverState.SOBER_ALERT:
+        if state != DriverState.NORMAL:
             cv2.rectangle(img, (10, 10), (img.shape[1]-10, 50), color, 3)
             
             if state == DriverState.ASLEEP:
                 cv2.putText(img, "CRITICAL ALERT!", (img.shape[1]//2-100, 35),
                             cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 3)
-            elif state == DriverState.INTOXICATED:
+            elif state == DriverState.HIGH_RISK:
                 cv2.putText(img, "⚠️ DRIVER IMPAIRED!", (img.shape[1]//2-120, 35),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 0, 255), 3)
 

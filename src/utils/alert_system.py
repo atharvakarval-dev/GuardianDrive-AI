@@ -107,18 +107,22 @@ class SecureAlertSystem:
         """Determine alert severity based on driver state and metrics"""
         if driver_state == "Asleep":
             return AlertSeverity.CRITICAL
-        elif driver_state == "Drunk":
+        elif driver_state == "High Risk": # Replaces "Drunk"
             if metrics.get("confidence", 0) > self.config["alert_thresholds"]["intoxication_confidence"]:
                 return AlertSeverity.CRITICAL
             else:
                 return AlertSeverity.HIGH
-        elif driver_state == "Sleepy/Drowsy":
+        elif driver_state == "Drowsy": # Replaces "Sleepy/Drowsy"
             if duration > self.config["alert_thresholds"]["critical_duration"]:
                 return AlertSeverity.CRITICAL
             elif duration > self.config["alert_thresholds"]["drowsy_duration"]:
                 return AlertSeverity.HIGH
             else:
                 return AlertSeverity.MEDIUM
+        elif driver_state == "Moderate Risk":
+            return AlertSeverity.MEDIUM
+        elif driver_state == "Low Risk":
+            return AlertSeverity.LOW
         else:
             return AlertSeverity.LOW
     
