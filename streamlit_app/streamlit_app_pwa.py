@@ -1030,8 +1030,8 @@ class UltraGuardianDetector(VideoProcessorBase):
 
 def render_live_detection():
     """Enhanced live detection page"""
-    st.title("🛡️ GuardianDrive AI Ultra - Live Detection")
-    st.markdown("**Next-generation multimodal driver safety monitoring**")
+    st.title("🛡️ GuardianDrive AI Ultra v2.1 (Geometric)")
+    st.markdown("**Next-generation multimodal driver safety monitoring - Optimized**")
     
     # Control panel
     col1, col2, col3, col4 = st.columns(4)
